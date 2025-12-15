@@ -31,7 +31,25 @@ app.get('/',(req,res)=>{
 async function run(params) {
    try{
     const db= client.db("blood_user");
-   
+    const userCollection= db.collection('user');
+
+    app.post('/users',async(req,res)=>{
+        const user= req.body;
+        user.role= "donor";
+
+        const result= await userCollection.insertOne(user);
+        res.send({
+          success:true,
+          result
+        });
+    })
+
+    app.get('/users/role/:email',async(req,res)=>{
+      const email = req.params;
+
+      const query={email:email}
+      const result = await userCollection.findOne(query)
+    })
 
      await client.db("admin").command({ ping: 1 });
     console.log("Pinged your deployment. You successfully connected to MongoDB!");
