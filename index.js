@@ -37,6 +37,8 @@ async function run(params) {
     // post data to database
     app.post('/users',async(req,res)=>{
         const user= req.body;
+        // user.bloodgroup= user.bloodGroup;
+
         user.role= "donor";
 
         const result= await userCollection.insertOne(user);
