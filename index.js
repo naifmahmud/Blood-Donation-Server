@@ -32,12 +32,12 @@ async function run(params) {
    try{
     const db= client.db("blood_user");
     const userCollection= db.collection('user');
+    const requestsCollection=db.collection('requests');
 
 
     // post data to database
     app.post('/users',async(req,res)=>{
         const user= req.body;
-        // user.bloodgroup= user.bloodGroup;
 
         user.role= "donor";
 
@@ -54,6 +54,20 @@ async function run(params) {
 
       const result = await userCollection.findOne({email})
       res.send(result);
+    })
+
+    // Requests
+    app.post('/requests',async(req,res)=>{
+      const data = req.body;
+
+      const date = new Date()
+  .toLocaleDateString("sv-SE", { timeZone: "Asia/Dhaka" });
+      data.createdAt= date;
+      const result= await requestsCollection.insertOne(data);
+      res.send({
+        success:true,
+        result
+      })
     })
 
      await client.db("admin").command({ ping: 1 });
