@@ -2,7 +2,7 @@ require("dotenv").config();
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const express= require("express");
 const cors= require("cors");
-const port= process.env.PORT || 3000;
+const port= process.env.PORT || 5000;
 
 
 const app=express();
@@ -33,6 +33,8 @@ async function run(params) {
     const db= client.db("blood_user");
     const userCollection= db.collection('user');
 
+
+    // post data to database
     app.post('/users',async(req,res)=>{
         const user= req.body;
         user.role= "donor";
@@ -44,11 +46,12 @@ async function run(params) {
         });
     })
 
+    // get data from database
     app.get('/users/role/:email',async(req,res)=>{
-      const email = req.params;
+      const {email} = req.params;
 
-      const query={email:email}
-      const result = await userCollection.findOne(query)
+      const result = await userCollection.findOne({email})
+      res.send(result);
     })
 
      await client.db("admin").command({ ping: 1 });
