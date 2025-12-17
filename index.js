@@ -9,6 +9,38 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+
+const admin = require("firebase-admin");
+const decoded = Buffer.from(process.env.FB_SERVICE_KEY, 'base64').toString('utf8')
+const serviceAccount = JSON.parse(decoded);
+
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount)
+});
+
+const verifyFBToken= async(req,res,next)=>{
+
+  const token= req.headers.authorization;
+
+  if(!token){
+    return res.status(401).send({message:"unauthorized access"})
+  }
+
+  try{
+    const idToken= token.split(' ')[1]
+    const decoded= await admin.auth().verifyIdToken(idToken)
+    console.log("Decoded info", decoded);
+    req.decoded_email= decoded.email;
+    next
+  }
+  catch(error){
+     return res.status(401).send({message:"unauthorized access"})
+  }
+}
+
+
+
+
 const uri = `mongodb+srv://${process.env.db_username}:${process.env.db_password}@cluster0.4guptnm.mongodb.net/?appName=Cluster0`;
 
 const client = new MongoClient(uri, {
@@ -50,29 +82,30 @@ async function run(params) {
       res.send(result);
     });
 
-    // Requests
-    app.post("/requests", async (req, res) => {
+    // create requests
+    app.post("/requests",verifyFBToken,async (req, res) => {
       const data = req.body;
 
-      const date = new Date().toLocaleDateString("sv-SE", {
-        timeZone: "Asia/Dhaka",
-      });
-      data.donation_date = date;
+      data.donation_status = "pending";
 
-      const time = new Date().toLocaleTimeString("en-GB", {
-        timeZone: "Asia/Dhaka",
-        hour12: false,
-      });
-
-      data.donation_time=time;
-
-      data.status = "pending";
       const result = await requestsCollection.insertOne(data);
       res.send({
         success: true,
         result,
       });
     });
+
+    // 
+
+    
+
+
+
+
+
+
+
+
 
     await client.db("admin").command({ ping: 1 });
     console.log(
