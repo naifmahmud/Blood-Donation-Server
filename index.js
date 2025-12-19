@@ -3,41 +3,42 @@ const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 const express = require("express");
 const cors = require("cors");
 const port = process.env.PORT || 5000;
+const stripe = require("stripe")(process.env.STRIPE_KEY);
+const crypto = require("crypto");
 
 const app = express();
 
 app.use(cors());
 app.use(express.json());
 
-
 const admin = require("firebase-admin");
-const decoded = Buffer.from(process.env.FB_SERVICE_KEY, 'base64').toString('utf8')
+const { url } = require("inspector");
+const decoded = Buffer.from(process.env.FB_SERVICE_KEY, "base64").toString(
+  "utf8"
+);
 const serviceAccount = JSON.parse(decoded);
 
 admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount)
+  credential: admin.credential.cert(serviceAccount),
 });
 
-const verifyFBToken= async(req,res,next)=>{
+const verifyFBToken = async (req, res, next) => {
+  const token = req.headers.authorization;
 
-  const token= req.headers.authorization;
-
-  if(!token){
-    return res.status(401).send({message:"unauthorized access"})
+  if (!token) {
+    return res.status(401).send({ message: "unauthorized access" });
   }
 
-  try{
-    const idToken= token.split(' ')[1]
-    const decoded= await admin.auth().verifyIdToken(idToken)
+  try {
+    const idToken = token.split(" ")[1];
+    const decoded = await admin.auth().verifyIdToken(idToken);
     console.log("Decoded info", decoded);
-    req.decoded_email= decoded.email;
+    req.decoded_email = decoded.email;
     next();
+  } catch (error) {
+    return res.status(401).send({ message: "unauthorized access" });
   }
-  catch(error){
-     return res.status(401).send({message:"unauthorized access"})
-  }
-}
-
+};
 
 const uri = `mongodb+srv://${process.env.db_username}:${process.env.db_password}@cluster0.4guptnm.mongodb.net/?appName=Cluster0`;
 
@@ -74,10 +75,10 @@ async function run(params) {
     });
 
     // All users
-    app.get('/users',verifyFBToken,async(req,res)=>{
-      const result= await userCollection.find().toArray();
+    app.get("/users", verifyFBToken, async (req, res) => {
+      const result = await userCollection.find().toArray();
       res.send(result);
-    })
+    });
 
     // get data from database
     app.get("/users/role/:email", async (req, res) => {
@@ -87,22 +88,21 @@ async function run(params) {
       res.send(result);
     });
 
+    app.patch("/update/user/status", verifyFBToken, async (req, res) => {
+      const { email, status } = req.query;
+      const query = { email: email };
 
-    app.patch('/update/user/status',verifyFBToken,async(req,res)=>{
-      const {email,status}= req.query;
-      const query = {email:email}
-
-      const updateStatus={
-        $set:{
-          user_status:status
-        }
-      }
-      const result= await userCollection.updateOne(query,updateStatus)
-      res.send(result)
-    })
+      const updateStatus = {
+        $set: {
+          user_status: status,
+        },
+      };
+      const result = await userCollection.updateOne(query, updateStatus);
+      res.send(result);
+    });
 
     // create requests
-    app.post("/requests",verifyFBToken,async (req, res) => {
+    app.post("/requests", verifyFBToken, async (req, res) => {
       const data = req.body;
 
       data.donation_status = "pending";
@@ -115,33 +115,56 @@ async function run(params) {
     });
 
     // my requests
-    app.get('/myRequests',verifyFBToken,async(req,res)=>{
-      const email= req.decoded_email;
+    app.get("/myRequests", verifyFBToken, async (req, res) => {
+      const email = req.decoded_email;
       const size = Number(req.query.size);
       const page = Number(req.query.page);
 
-      const query= {requester_email:email}
+      const query = { requester_email: email };
       const result = await requestsCollection
-      .find(query)
-      .limit(size)
-      .skip(size*page)
-      .toArray();
+        .find(query)
+        .limit(size)
+        .skip(size * page)
+        .toArray();
 
-      const totalRequest= await requestsCollection.countDocuments(query);
+      const totalRequest = await requestsCollection.countDocuments(query);
 
-      res.send({request: result, totalRequest})
-      
-    })
+      res.send({ request: result, totalRequest });
+    });
 
-    
+    // payments
 
+    app.post("/create-payment-checkout", async (req, res) => {
+      const info = req.body;
+      const amount = parseInt(info.donateAmout) * 100;
 
+      const session = await stripe.checkout.sessions.create({
+        
+        line_items: [
+          {
+            price_data:{
+              currency:'usd',
+              unit_amount: amount,
+              product_data: {
+                name: 'Please Donate'
+              }
+            },
+            quantity:1,
+          },
+        ],
+        mode: "payment",
+        metadata:{
+          donorName: info?.donorName
+        },
+        customer_email:info?.donorEmail,
 
+        success_url:`${process.env.SITE_DOMAIN}/payment_success?session_id={CHECKOUT_SESSION_ID}`,
 
+        cancel_url: `${process.env.SITE_DOMAIN}/payment_canceled`,
+      });
 
-
-
-
+      res.send({url: session.url})
+    });
 
     await client.db("admin").command({ ping: 1 });
     console.log(
