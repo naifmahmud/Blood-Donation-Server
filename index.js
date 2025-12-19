@@ -39,8 +39,6 @@ const verifyFBToken= async(req,res,next)=>{
 }
 
 
-
-
 const uri = `mongodb+srv://${process.env.db_username}:${process.env.db_password}@cluster0.4guptnm.mongodb.net/?appName=Cluster0`;
 
 const client = new MongoClient(uri, {
@@ -66,6 +64,7 @@ async function run(params) {
       const user = req.body;
 
       user.role = "donor";
+      user.user_status = "active";
 
       const result = await userCollection.insertOne(user);
       res.send({
@@ -74,6 +73,12 @@ async function run(params) {
       });
     });
 
+    // All users
+    app.get('/users',verifyFBToken,async(req,res)=>{
+      const result= await userCollection.find().toArray();
+      res.send(result);
+    })
+
     // get data from database
     app.get("/users/role/:email", async (req, res) => {
       const { email } = req.params;
@@ -81,6 +86,20 @@ async function run(params) {
       const result = await userCollection.findOne({ email });
       res.send(result);
     });
+
+
+    app.patch('/update/user/status',verifyFBToken,async(req,res)=>{
+      const {email,status}= req.query;
+      const query = {email:email}
+
+      const updateStatus={
+        $set:{
+          user_status:status
+        }
+      }
+      const result= await userCollection.updateOne(query,updateStatus)
+      res.send(result)
+    })
 
     // create requests
     app.post("/requests",verifyFBToken,async (req, res) => {
@@ -95,7 +114,24 @@ async function run(params) {
       });
     });
 
-    // 
+    // my requests
+    app.get('/myRequests',verifyFBToken,async(req,res)=>{
+      const email= req.decoded_email;
+      const size = Number(req.query.size);
+      const page = Number(req.query.page);
+
+      const query= {requester_email:email}
+      const result = await requestsCollection
+      .find(query)
+      .limit(size)
+      .skip(size*page)
+      .toArray();
+
+      const totalRequest= await requestsCollection.countDocuments(query);
+
+      res.send({request: result, totalRequest})
+      
+    })
 
     
 
