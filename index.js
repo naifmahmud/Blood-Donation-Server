@@ -31,7 +31,7 @@ const verifyFBToken= async(req,res,next)=>{
     const decoded= await admin.auth().verifyIdToken(idToken)
     console.log("Decoded info", decoded);
     req.decoded_email= decoded.email;
-    next
+    next();
   }
   catch(error){
      return res.status(401).send({message:"unauthorized access"})
