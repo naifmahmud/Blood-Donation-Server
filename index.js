@@ -115,6 +115,12 @@ async function run(params) {
       });
     });
 
+    app.get('/allRequests',async(req,res)=>{
+      const result= await requestsCollection.find({donation_status
+:'pending'}).toArray();
+      res.send(result);
+    })
+
     // my requests
     app.get("/myRequests", verifyFBToken, async (req, res) => {
       const email = req.decoded_email;
@@ -134,7 +140,6 @@ async function run(params) {
     });
 
     // payments
-
     app.post("/create-payment-checkout", async (req, res) => {
       const info = req.body;
       const amount = parseInt(info.donateAmout) * 100;
