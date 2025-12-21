@@ -59,6 +59,7 @@ async function run(params) {
     const db = client.db("blood_user");
     const userCollection = db.collection("user");
     const requestsCollection = db.collection("requests");
+    const fundCollection =db.collection("funding")
 
     // post data to database
     app.post("/users", async (req, res) => {
@@ -165,6 +166,68 @@ async function run(params) {
 
       res.send({url: session.url})
     });
+
+
+    app.get('/search',async(req,res)=>{
+      const {bloodGroup,district,upazila}=req.query;
+      
+      const query={};
+
+      if(!query) {
+        return
+      }
+      if(bloodGroup){
+        query.bloodgroup= bloodGroup;
+      }
+      if(district){
+        query.
+recipient_district=district;
+      }
+      if(upazila){
+        query.recipient_upazila=upazila;
+      }
+      
+      // console.log(query);
+      const result= await requestsCollection.find(query).toArray();
+      res.send(result);
+      
+      
+    })
+
+
+
+    // payment success
+    app.post('/success-payment',async(req,res)=>{
+      const {session_id}= req.query;
+      const session = await stripe.checkout.sessions.retrieve(session_id);
+
+      console.log(session);
+
+      const transectionId= session.payment_intent;
+
+      const isPaymentExist= await fundCollection.findOne({transectionId})
+
+      if(isPaymentExist){
+        return
+      }
+
+
+      if(session.payment_status == 'paid'){
+        const paymentInfo={
+          amount:session.amount_total/100,
+          currency:session.currency,
+          donorEmail:session.customer_email,
+          transectionId,
+          payment_status: session.payment_status,
+          paidAt: new Date() 
+
+        }
+        const result= await fundCollection.insertOne(paymentInfo);
+        return res.send(result);
+      }
+      
+
+    })
 
     await client.db("admin").command({ ping: 1 });
     console.log(
