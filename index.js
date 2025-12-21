@@ -89,6 +89,21 @@ async function run(params) {
       res.send(result);
     });
 
+    // Update user
+    app.patch("/update/user/profile",async(req,res)=>{
+      const {email, ...editData}=req.body;
+      const filter= {email};
+
+      console.log(editData)
+      
+
+      const result= await userCollection.updateOne(filter,{$set:editData});
+      res.send({
+        success:true,
+        result
+      })
+    })
+
     app.patch("/update/user/status", verifyFBToken, async (req, res) => {
       const { email, status } = req.query;
       const query = { email: email };
