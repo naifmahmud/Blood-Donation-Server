@@ -59,7 +59,7 @@ async function run(params) {
     const db = client.db("blood_user");
     const userCollection = db.collection("user");
     const requestsCollection = db.collection("requests");
-    const fundCollection =db.collection("funding")
+    const fundCollection = db.collection("funding");
 
     // post data to database
     app.post("/users", async (req, res) => {
@@ -89,20 +89,33 @@ async function run(params) {
       res.send(result);
     });
 
+    // update user Role
+  app.patch("/update/user/role", verifyFBToken, async (req, res) => {
+      const { email, role } = req.query;
+      const query = { email: email };
+
+      const updateStatus = {
+        $set: {
+          role: role,
+        },
+      };
+      const result = await userCollection.updateOne(query, updateStatus);
+      res.send(result);
+    });
+
     // Update user
-    app.patch("/update/user/profile",async(req,res)=>{
-      const {email, ...editData}=req.body;
-      const filter= {email};
+    app.patch("/update/user/profile", async (req, res) => {
+      const { email, ...editData } = req.body;
+      const filter = { email };
 
-      console.log(editData)
-      
+      console.log(editData);
 
-      const result= await userCollection.updateOne(filter,{$set:editData});
+      const result = await userCollection.updateOne(filter, { $set: editData });
       res.send({
-        success:true,
-        result
-      })
-    })
+        success: true,
+        result,
+      });
+    });
 
     app.patch("/update/user/status", verifyFBToken, async (req, res) => {
       const { email, status } = req.query;
@@ -131,55 +144,73 @@ async function run(params) {
     });
 
     // get all blood requests
-    app.get('/allRequests',async(req,res)=>{
-      const result= await requestsCollection.find({donation_status
-:'pending'}).toArray();
+    app.get("/allRequests", async (req, res) => {
+      const result = await requestsCollection
+        .find({ donation_status: "pending" })
+        .toArray();
       res.send(result);
-    })
+    });
+
+    // get all blood requests
+    app.get("/allRequests", verifyFBToken, async (req, res) => {
+      const size = Number(req.query.size);
+      const page = Number(req.query.page);
+
+     
+      const result = await requestsCollection
+        .find(query)
+        .skip(page * size)
+        .limit(size)
+        .toArray();
+
+      const totalRequest = await requestsCollection.countDocuments(result);
+
+      res.send({ result, totalRequest });
+    });
 
     // Find on blood request by id
-    app.get('/allRequests/:id',async(req,res)=>{
-      const id= req.params.id;
-      const query= {'_id':new ObjectId(id)};
-      const result=await requestsCollection.findOne(query);
+    app.get("/allRequests/:id", async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const result = await requestsCollection.findOne(query);
       res.send({
-        success:true,
-        result
-      })
-    })
+        success: true,
+        result,
+      });
+    });
 
     // update donation status
-    app.patch('/allRequests/:id/donation',async(req,res)=>{
-      const id= req.params.id;
-      const {requester_email,requester_name}=req.body;
-      const query={'_id':new ObjectId(id)}
-      const update={
-        $set:{
-            donation_status:"inprogress",
-            requester_email,
-            requester_name
-          }
-      }
+    app.patch("/allRequests/:id/donation", async (req, res) => {
+      const id = req.params.id;
+      const { requester_email, requester_name } = req.body;
+      const query = { _id: new ObjectId(id) };
+      const update = {
+        $set: {
+          donation_status: "inprogress",
+          requester_email,
+          requester_name,
+        },
+      };
 
-      const result= await requestsCollection.updateOne(query,update)
+      const result = await requestsCollection.updateOne(query, update);
 
       res.send({
-        success:true,
-        result
-      })
-    })
+        success: true,
+        result,
+      });
+    });
 
     // my requests
     app.get("/myRequests", verifyFBToken, async (req, res) => {
       const email = req.decoded_email;
       const size = Number(req.query.size);
       const page = Number(req.query.page);
-      const status= req.query.status;
+      const status = req.query.status;
 
       const query = { requester_email: email };
 
-      if(status && status !== "all"){
-        query.donation_status =status;
+      if (status && status !== "all") {
+        query.donation_status = status;
       }
 
       const result = await requestsCollection
@@ -194,23 +225,23 @@ async function run(params) {
     });
 
     // dashboard my requests
-    app.get('/myRequests/recent/:email',async(req,res)=>{
-      const email= req.params.email;
+    app.get("/myRequests/recent/:email", async (req, res) => {
+      const email = req.params.email;
 
-      const result= await requestsCollection
-      .find({requester_email:email})
-      .sort({
-        donation_date:-1,
-        donation_time:-1
-      })
-      .limit(3)
-      .toArray();
+      const result = await requestsCollection
+        .find({ requester_email: email })
+        .sort({
+          donation_date: -1,
+          donation_time: -1,
+        })
+        .limit(3)
+        .toArray();
 
       res.send({
-        success:true,
-        result
-      })
-    })
+        success: true,
+        result,
+      });
+    });
 
     // payments
     app.post("/create-payment-checkout", async (req, res) => {
@@ -218,94 +249,108 @@ async function run(params) {
       const amount = parseInt(info.donateAmout) * 100;
 
       const session = await stripe.checkout.sessions.create({
-        
         line_items: [
           {
-            price_data:{
-              currency:'usd',
+            price_data: {
+              currency: "usd",
               unit_amount: amount,
               product_data: {
-                name: 'Please Donate'
-              }
+                name: "Please Donate",
+              },
             },
-            quantity:1,
+            quantity: 1,
           },
         ],
         mode: "payment",
-        metadata:{
-          donorName: info?.donorName
+        metadata: {
+          donorName: info?.donorName,
         },
-        customer_email:info?.donorEmail,
+        customer_email: info?.donorEmail,
 
-        success_url:`${process.env.SITE_DOMAIN}/payment_success?session_id={CHECKOUT_SESSION_ID}`,
+        success_url: `${process.env.SITE_DOMAIN}/payment_success?session_id={CHECKOUT_SESSION_ID}`,
 
         cancel_url: `${process.env.SITE_DOMAIN}/payment_canceled`,
       });
 
-      res.send({url: session.url})
+      res.send({ url: session.url });
     });
 
+    app.get("/search", async (req, res) => {
+      const { bloodGroup, district, upazila } = req.query;
 
-    app.get('/search',async(req,res)=>{
-      const {bloodGroup,district,upazila}=req.query;
-      
-      const query={};
+      const query = {};
 
-      if(!query) {
-        return
+      if (!query) {
+        return;
       }
-      if(bloodGroup){
-        query.bloodgroup= bloodGroup;
+      if (bloodGroup) {
+        query.bloodgroup = bloodGroup;
       }
-      if(district){
-        query.
-recipient_district=district;
+      if (district) {
+        query.recipient_district = district;
       }
-      if(upazila){
-        query.recipient_upazila=upazila;
+      if (upazila) {
+        query.recipient_upazila = upazila;
       }
-      
+
       // console.log(query);
-      const result= await requestsCollection.find(query).toArray();
+      const result = await requestsCollection.find(query).toArray();
       res.send(result);
-      
-      
-    })
-
-
+    });
 
     // payment success
-    app.post('/success-payment',async(req,res)=>{
-      const {session_id}= req.query;
+    app.post("/success-payment", async (req, res) => {
+      const { session_id } = req.query;
       const session = await stripe.checkout.sessions.retrieve(session_id);
 
       console.log(session);
 
-      const transectionId= session.payment_intent;
+      const transectionId = session.payment_intent;
 
-      const isPaymentExist= await fundCollection.findOne({transectionId})
+      const isPaymentExist = await fundCollection.findOne({ transectionId });
 
-      if(isPaymentExist){
-        return
+      if (isPaymentExist) {
+        return;
       }
 
-
-      if(session.payment_status == 'paid'){
-        const paymentInfo={
-          amount:session.amount_total/100,
-          currency:session.currency,
-          donorEmail:session.customer_email,
+      if (session.payment_status == "paid") {
+        const paymentInfo = {
+          amount: session.amount_total / 100,
+          currency: session.currency,
+          donorEmail: session.customer_email,
           transectionId,
           payment_status: session.payment_status,
-          paidAt: new Date() 
-
-        }
-        const result= await fundCollection.insertOne(paymentInfo);
+          paidAt: new Date(),
+        };
+        const result = await fundCollection.insertOne(paymentInfo);
         return res.send(result);
       }
-      
+    });
 
-    })
+    // admin dashboard
+    app.get("/dashboard/stats", async (req, res) => {
+      const totalUsers = await userCollection.countDocuments({ role: "donor" });
+
+      const fundResult = await fundCollection
+        .aggregate([
+          { $match: { payment_status: "paid" } },
+          {
+            $group: {
+              _id: null,
+              totalFunding: { $sum: "$amount" },
+            },
+          },
+        ])
+        .toArray();
+
+      const totalRequests = await requestsCollection.countDocuments();
+
+      res.send({
+        totalUsers,
+        totalFunding: fundResult[0]?.totalFunding || 0,
+        totalRequests,
+      });
+    });
 
     await client.db("admin").command({ ping: 1 });
     console.log(
