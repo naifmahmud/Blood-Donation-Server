@@ -152,21 +152,29 @@ async function run(params) {
     });
 
     // get all blood requests
-    app.get("/allRequests", verifyFBToken, async (req, res) => {
-      const size = Number(req.query.size);
-      const page = Number(req.query.page);
+       app.get("/allRequests", verifyFBToken, async (req, res) => {
+  const size = Number(req.query.size);
+  const page = Number(req.query.page);
+  const status = req.query.status;
 
-     
-      const result = await requestsCollection
-        .find(query)
-        .skip(page * size)
-        .limit(size)
-        .toArray();
+  const query = {};
 
-      const totalRequest = await requestsCollection.countDocuments(result);
+  if (status && status !== "all") {
+    query.donation_status = status;
+  }
 
-      res.send({ result, totalRequest });
-    });
+  const result = await requestsCollection
+    .find(query)
+    .skip(page * size)
+    .limit(size)
+    .toArray();
+
+  const totalRequest = await requestsCollection.countDocuments(query);
+
+  res.send({ request: result, totalRequest });
+});
+
+
 
     // Find on blood request by id
     app.get("/allRequests/:id", async (req, res) => {
@@ -242,6 +250,40 @@ async function run(params) {
         result,
       });
     });
+
+    // edit my request 
+    app.patch('/myRequests/:id',verifyFBToken,async(req,res)=>{
+      const id= req.params.id;
+      const updateData= req.body;
+      const query={'_id':new ObjectId(id)};
+
+      const result= await requestsCollection.updateOne(query,{
+        $set: updateData
+      })
+
+      res.send({
+        success:true,
+        result
+      })
+    })
+
+    // delete
+    app.delete('/myRequests/:id',verifyFBToken,async(req,res)=>{
+      const id = req.params.id;
+  const email = req.decoded_email;
+
+  const result = await requestsCollection.deleteOne({
+    _id: new ObjectId(id),
+    requester_email:email
+    })
+
+    res.send({
+      success:true,
+      result
+    })
+
+  })
+  
 
     // payments
     app.post("/create-payment-checkout", async (req, res) => {
