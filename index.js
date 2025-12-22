@@ -130,10 +130,43 @@ async function run(params) {
       });
     });
 
+    // get all blood requests
     app.get('/allRequests',async(req,res)=>{
       const result= await requestsCollection.find({donation_status
 :'pending'}).toArray();
       res.send(result);
+    })
+
+    // Find on blood request by id
+    app.get('/allRequests/:id',async(req,res)=>{
+      const id= req.params.id;
+      const query= {'_id':new ObjectId(id)};
+      const result=await requestsCollection.findOne(query);
+      res.send({
+        success:true,
+        result
+      })
+    })
+
+    // update donation status
+    app.patch('/allRequests/:id/donation',async(req,res)=>{
+      const id= req.params.id;
+      const {requester_email,requester_name}=req.body;
+      const query={'_id':new ObjectId(id)}
+      const update={
+        $set:{
+            donation_status:"inprogress",
+            requester_email,
+            requester_name
+          }
+      }
+
+      const result= await requestsCollection.updateOne(query,update)
+
+      res.send({
+        success:true,
+        result
+      })
     })
 
     // my requests
