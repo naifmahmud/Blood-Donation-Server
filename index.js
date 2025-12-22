@@ -174,8 +174,14 @@ async function run(params) {
       const email = req.decoded_email;
       const size = Number(req.query.size);
       const page = Number(req.query.page);
+      const status= req.query.status;
 
       const query = { requester_email: email };
+
+      if(status && status !== "all"){
+        query.donation_status =status;
+      }
+
       const result = await requestsCollection
         .find(query)
         .limit(size)
@@ -186,6 +192,25 @@ async function run(params) {
 
       res.send({ request: result, totalRequest });
     });
+
+    // dashboard my requests
+    app.get('/myRequests/recent/:email',async(req,res)=>{
+      const email= req.params.email;
+
+      const result= await requestsCollection
+      .find({requester_email:email})
+      .sort({
+        donation_date:-1,
+        donation_time:-1
+      })
+      .limit(3)
+      .toArray();
+
+      res.send({
+        success:true,
+        result
+      })
+    })
 
     // payments
     app.post("/create-payment-checkout", async (req, res) => {
